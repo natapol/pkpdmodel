@@ -1,0 +1,143 @@
+---
+title: "biopharmaceutics"
+format: html
+editor: visual
+---
+
+## Load library
+
+```{r}
+library(mrgsolve)
+library(ggplot2)
+library(dplyr)
+```
+
+## Zero order
+
+```{r}
+model <- '
+$PARAM @annotated
+k0 :   5.5 : rate constant (ng/ml/min)
+
+$INIT @annotated
+C      :   200 : Dosing compartment (ng/ml)
+
+$ODE
+
+dxdt_C = -k0;
+
+' %>% 
+  mcode("mymodel", .)
+```
+
+
+```{r}
+out <- model %>% mrgsim(end=50,delta=0.1) %>% filter(C >= 0)
+```
+
+```{r}
+out %>% ggplot(aes(x=time, y=C)) +
+  geom_line()
+```
+
+## First order
+
+```{r}
+model <- '
+$PARAM @annotated
+k1 :   0.04 : rate constant (ng/ml/min)
+
+$INIT @annotated
+C      :   200 : Dosing compartment (ng/ml)
+
+$ODE
+
+dxdt_C = -k1*C;
+
+' %>% 
+  mcode("mymodel", .)
+```
+
+
+```{r}
+out <- model %>% mrgsim(end=50,delta=0.1) %>% filter(C >= 0)
+```
+
+```{r}
+out %>% ggplot(aes(x=time, y=C)) +
+  geom_line()
+```
+
+## One compartment model
+
+```{r}
+model <- '
+$PARAM @annotated
+kel :   0.04 : rate constant (mg/hr)
+V0  :    0.3 : L/Kg
+W   :     50 : Kg
+
+$MAIN
+double Vd = V0 * W;
+
+$INIT @annotated
+D      :   0 : Dosing compartment (mg)
+
+$ODE
+
+dxdt_D = -kel*D;
+
+$TABLE
+capture CP = D/Vd;
+' %>% 
+  mcode("mymodel", .)
+```
+
+
+```{r}
+out <- model %>% ev(amt=100, ii=6, addl = 5) %>% mrgsim(end=50,delta=0.1) %>% as_tibble()
+```
+
+```{r}
+out %>% ggplot(aes(x=time, y=CP)) +
+  geom_line()
+```
+
+## Compartment Model Oral Administration
+
+```{r}
+model <- '
+$PARAM @annotated
+ka  : 0.0002 : rate constant (mg/hr)
+kel :      4 : rate constant (mg/hr)
+V0  :    0.3 : L/Kg
+W   :     50 : Weight
+F   : 0.000005 : S
+
+$MAIN
+double Vd = V0 * W;
+
+$INIT @annotated
+Xa     :   0 : intestinal compartment (mg)
+D      :   0 : blood compartment (mg)
+
+$ODE
+
+dxdt_Xa = -ka*Xa;
+dxdt_D = ka*F*Xa - kel*D;
+
+$TABLE
+capture CP = D/Vd;
+' %>% 
+  mcode("mymodel", .)
+```
+
+
+```{r}
+out <- model %>% ev(amt=100) %>% mrgsim(end=500,delta=0.1) %>% as_tibble()
+```
+
+```{r}
+out %>% ggplot(aes(x=time, y=CP)) +
+  geom_line()
+```
